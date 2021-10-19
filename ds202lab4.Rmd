@@ -1,0 +1,121 @@
+---
+title: "ds 202 lab 4"
+author: "Rachel Grober"
+date: "10/14/2021"
+output: html_document
+---
+#Part 1
+#Cleaning the Data
+```{r}
+library(readxl)
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+defense <- read_excel('cyclonesFootball2020.xlsx', sheet='Defensive')
+biography <- read_excel('cyclonesFootball2020.xlsx', sheet='Biography')
+offense <- read_excel('cyclonesFootball2020.xlsx', sheet='Offensive')
+str(defense)
+View(defense)
+View(offense)
+View(biography)
+defClean <- mutate(defense,
+       Name = as.factor(Name),
+       Opponent = as.factor(Opponent_Opponent),
+       (across(Tackles_Solo:Pass_PB, as.numeric)))
+str(biography)
+bioClean<-separate(biography, Height, c('feet', 'inches'), sep='-')
+View(bioClean)
+bioClean<-mutate(bioClean,
+             feet = as.numeric(feet),
+             inches = as.numeric(inches))
+bioClean<-mutate(bioClean,
+             Height = (feet*12+inches))
+View(bioClean)
+str(bioClean)
+bioClean <- mutate(bioClean,
+              Weight = as.numeric(Weight))
+str(bioClean)
+defClean <- defClean %>%
+  group_by(Name, Opponent_Opponent) %>%
+  mutate(GameNumber = row_number())
+View(defClean)
+offClean <- mutate(offense,
+       Name = as.factor(Name),
+       Opponent = as.factor(Opponent_Opponent),
+       (across(Receiving_REC:Passing_INT, as.numeric)))
+offClean <- offClean %>%
+  group_by(Name, Opponent_Opponent) %>%
+  mutate(GameNumber = row_number())
+View(offClean)
+
+```
+
+#Part 2
+#Question 1
+```{r}
+offClean1 <- offClean %>% 
+  pivot_longer(Receiving_REC:Passing_INT, names_to = 'stat', values_to='number')
+```
+
+#Question 2
+```{r}
+offClean2<-offClean1 %>%
+  group_by(Name, stat) %>%
+  summarize(sum=sum(number, na.rm=TRUE))
+View(offClean2)
+```
+
+#Question 3
+```{r}
+ggplot(offClean2, aes(x =`sum`))+
+  geom_histogram()+
+  facet_wrap(~stat, scales = 'free')
+#Players tend to have more receiving yards than rushing yards. In addition, players tend to have more recieving touchdowns than rushing touchdowns. 
+```
+
+#Question 4
+```{r}
+offClean3 <- offClean1 %>% 
+  select(-Opponent) %>%
+  filter(stat=='Receiving_YDS')%>%
+  pivot_wider(names_from = 'Opponent_Opponent', values_from='number')
+View(offClean3)
+
+ggplot(offClean3, aes(x=Oregon, y=Oklahoma)) +geom_point()+ geom_abline()
+#Based on recieving yards, Iowa State had a been game against Oklahoma than they did against Oregon. This can be visualized in the scatter plot generated below.
+
+bioClean<-separate(bioClean, Hometown, c('city', 'state'), sep=', ')
+View(bioClean)
+```
+
+#Question 5
+```{r}
+bioClean %>%
+  group_by(state)%>%
+  count()
+```
+
+#Question 6
+```{r}
+BrockPurdy<- offClean %>%
+  ungroup %>%
+  filter(Name=='Purdy, Brock')%>%
+  select(Passing_YDS, Opponent_Opponent)
+View(BrockPurdy)
+Team<- offClean %>%
+  ungroup %>%
+  select(Receiving_TD, Opponent_Opponent)
+OffenseComparison<-inner_join(BrockPurdy,Team, by='Opponent_Opponent')
+View(OffenseComparison)
+ggplot(OffenseComparison, aes(x = Passing_YDS, fill = Receiving_TD)) +
+  geom_histogram(position='dodge')
+#Based on the histogram generated, as Brock's passing yards increase, the amount of touchdowns the ISU team makes tends to vary lowly. However, we can see that as Brock's passing yards are closer to 250, the total touchdowns made on offense tend to be the highest on average.
+Teamdefense<- defClean %>%
+  ungroup %>%
+  select(Turnover_FF, Opponent_Opponent)
+DefenseComparison<-inner_join(BrockPurdy,Teamdefense, by='Opponent_Opponent')
+View(DefenseComparison)
+ggplot(DefenseComparison, aes(x = Passing_YDS, fill = Turnover_FF)) +
+  geom_histogram(position='dodge')
+#From the histogram generated below, we can see that as Brock's passing yards increase, the defensive team's total turnovers vary dramatically. As Brock's, passing yards are very high or very low, we do see a decrease in the turnovers by the defensive team. As Brock's passing yards are closer to 250, the defensive turnover tend to be at their highest.
+```
